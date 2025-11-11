@@ -1,5 +1,6 @@
 /**
- * Audio recorder utility using MediaRecorder - Converts to WAV in browser
+ * Audio recorder utility - Records directly to WAV format using Web Audio API
+ * This bypasses MediaRecorder issues and ensures quality audio
  */
 
 class AudioRecorder {
@@ -12,33 +13,56 @@ class AudioRecorder {
         this.analyser = null;
         this.dataArray = null;
         this.isRecording = false;
+        this.processor = null;
+        this.recordingBuffer = [];
+        this.sampleRate = 44100;
+        this.recordingStartTime = null;
     }
 
     async startRecording(canvas, onUpdate) {
         try {
             // Get user media
-            this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            this.mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: false,
+                    sampleRate: 44100
+                }
+            });
             
-            // Create AudioContext for visualization
+            // Create AudioContext for recording and visualization
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            this.sampleRate = this.audioContext.sampleRate;
+            console.log('AudioContext sample rate:', this.sampleRate);
+            
             const source = this.audioContext.createMediaStreamSource(this.mediaStream);
             
             // Setup analyser for visualization
             this.setupVisualization(source);
             
-            // Create MediaRecorder
-            this.mediaRecorder = new MediaRecorder(this.mediaStream);
-            this.audioChunks = [];
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.audioChunks.push(event.data);
-                }
+            // Create ScriptProcessor for direct audio capture
+            // Use 4096 buffer size for better quality
+            const bufferSize = 4096;
+            this.processor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+            
+            this.recordingBuffer = [];
+            this.recordingStartTime = Date.now();
+            
+            this.processor.onaudioprocess = (event) => {
+                if (!this.isRecording) return;
+                
+                const inputData = event.inputBuffer.getChannelData(0);
+                // Store reference to the data
+                this.recordingBuffer.push(new Float32Array(inputData));
             };
-
-            // Start recording
-            this.mediaRecorder.start();
+            
+            // Connect nodes
+            source.connect(this.processor);
+            this.processor.connect(this.audioContext.destination);
+            
             this.isRecording = true;
+            console.log('Recording started...');
 
             // Start visualization
             if (canvas) {
@@ -53,40 +77,116 @@ class AudioRecorder {
     }
 
     async stopRecording() {
-        if (this.mediaRecorder && this.isRecording) {
-            return new Promise((resolve) => {
-                this.mediaRecorder.onstop = async () => {
-                    // Create blob from chunks
-                    const originalBlob = new Blob(this.audioChunks, { type: this.mediaRecorder.mimeType || 'audio/webm' });
+        this.isRecording = false;
+        
+        if (!this.processor) {
+            return null;
+        }
+        
+        return new Promise((resolve) => {
+            // Disconnect processor
+            this.processor.disconnect();
+            
+            // Give a small delay to ensure last data is captured
+            setTimeout(() => {
+                try {
+                    // Combine all recording buffers
+                    const totalLength = this.recordingBuffer.reduce((acc, buf) => acc + buf.length, 0);
+                    console.log('Total recorded samples:', totalLength);
+                    console.log('Duration (approx):', (totalLength / this.sampleRate).toFixed(2), 'seconds');
                     
-                    // Convert to WAV using AudioContext
-                    try {
-                        this.audioBlob = await convertToWAV(originalBlob);
-                        console.log('Converted to WAV:', this.audioBlob.size, 'bytes');
-                    } catch (error) {
-                        console.error('Error converting to WAV:', error);
-                        // Fallback to original blob
-                        this.audioBlob = originalBlob;
+                    if (totalLength === 0) {
+                        console.error('No audio data recorded');
+                        resolve(null);
+                        return;
                     }
                     
-                    this.isRecording = false;
-                    resolve(this.audioBlob);
-                };
-                
-                this.mediaRecorder.stop();
-                
-                // Stop all tracks
-                if (this.mediaStream) {
-                    this.mediaStream.getTracks().forEach(track => track.stop());
+                    // Merge all buffers into single array
+                    const mergedBuffer = new Float32Array(totalLength);
+                    let offset = 0;
+                    for (let buffer of this.recordingBuffer) {
+                        mergedBuffer.set(buffer, offset);
+                        offset += buffer.length;
+                    }
+                    
+                    // Encode to WAV
+                    const wavBlob = this.encodeWAVDirect(mergedBuffer, this.sampleRate);
+                    console.log('Encoded WAV blob:', wavBlob.size, 'bytes');
+                    
+                    this.audioBlob = wavBlob;
+                    
+                    // Stop all tracks
+                    if (this.mediaStream) {
+                        this.mediaStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    // Close audio context
+                    if (this.audioContext && this.audioContext.state !== 'closed') {
+                        this.audioContext.close();
+                    }
+                    
+                    resolve(wavBlob);
+                } catch (error) {
+                    console.error('Error stopping recording:', error);
+                    resolve(null);
                 }
-                
-                // Stop visualization
-                if (this.audioContext && this.audioContext.state !== 'closed') {
-                    this.audioContext.close();
-                }
-            });
+            }, 100);
+        });
+    }
+    
+    encodeWAVDirect(floatData, sampleRate) {
+        /**
+         * Encode raw float32 audio data to WAV format
+         * This ensures highest quality - no re-encoding
+         */
+        const numChannels = 1; // Mono
+        const bitDepth = 16;
+        const bytesPerSample = bitDepth / 8;
+        
+        // Calculate sizes
+        const dataLength = floatData.length * bytesPerSample;
+        const wavSize = 44 + dataLength;
+        
+        // Create buffer for WAV file
+        const arrayBuffer = new ArrayBuffer(wavSize);
+        const view = new DataView(arrayBuffer);
+        
+        // Helper functions
+        const writeString = (offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+        
+        // Write RIFF header
+        writeString(0, 'RIFF');
+        view.setUint32(4, wavSize - 8, true);
+        writeString(8, 'WAVE');
+        
+        // Write fmt subchunk
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true); // Subchunk1Size
+        view.setUint16(20, 1, true); // AudioFormat (PCM)
+        view.setUint16(22, numChannels, true); // NumChannels
+        view.setUint32(24, sampleRate, true); // SampleRate
+        view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // ByteRate
+        view.setUint16(32, numChannels * bytesPerSample, true); // BlockAlign
+        view.setUint16(34, bitDepth, true); // BitsPerSample
+        
+        // Write data subchunk
+        writeString(36, 'data');
+        view.setUint32(40, dataLength, true);
+        
+        // Write PCM data
+        let offset = 44;
+        for (let i = 0; i < floatData.length; i++) {
+            // Convert float32 (-1.0 to 1.0) to 16-bit PCM
+            const sample = Math.max(-1, Math.min(1, floatData[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+            offset += 2;
         }
-        return null;
+        
+        return new Blob([arrayBuffer], { type: 'audio/wav' });
     }
 
     setupVisualization(source) {

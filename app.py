@@ -7,13 +7,21 @@ from flask_cors import CORS
 import numpy as np
 import librosa
 import soundfile as sf
+from scipy.io import wavfile as scipy_wavfile
 import joblib
 import os
 import base64
 import io
 from audio_preprocessor import preprocess_audio
 from feature_extractor import extract_all_features
-from pydub import AudioSegment
+from audio_converter import load_audio_safe, convert_to_wav
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except ImportError:
+    PYDUB_AVAILABLE = False
+    AudioSegment = None
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -78,37 +86,31 @@ def predict():
         
         print(f"Saved audio file: {temp_path}, size: {os.path.getsize(temp_path)} bytes")
         
-        # Audio should already be WAV format from browser, but handle other formats if needed
+        # Audio format handling
         wav_path = None
         if file_ext not in ['wav', 'wave']:
+            # Try to convert to WAV using available libraries
             try:
                 print(f"Converting {file_ext} to WAV format...")
-                audio_segment = AudioSegment.from_file(temp_path, format=file_ext)
-                wav_path = 'temp_audio_converted.wav'
-                audio_segment.export(wav_path, format="wav")
-                print(f"Converted to WAV: {wav_path}")
-                temp_path = wav_path  # Use converted file
+                wav_path = convert_to_wav(temp_path)
+                if wav_path and os.path.exists(wav_path):
+                    print(f"✓ Converted to WAV: {wav_path}")
+                    temp_path = wav_path
+                else:
+                    print(f"⚠ Conversion returned no file, attempting to load {file_ext} directly...")
             except Exception as conv_error:
-                print(f"Warning: Could not convert audio format: {conv_error}")
-                # Try to load original format anyway - librosa might handle it
-                pass
+                print(f"⚠ Conversion warning: {conv_error}")
+                print(f"Attempting to load {file_ext} directly without conversion...")
         
-        # Load and preprocess audio
+        # Load and preprocess audio using safe loader with fallbacks
         try:
-            audio, sr = librosa.load(temp_path, sr=None, duration=10.0)
-            print(f"Loaded audio: {len(audio)} samples at {sr} Hz")
+            audio, sr = load_audio_safe(temp_path, sr=None, duration=10.0)
+            print(f"✓ Loaded audio: {len(audio)} samples at {sr} Hz")
         except Exception as load_error:
-            print(f"Error loading with librosa: {load_error}")
-            # Try with soundfile as fallback
-            try:
-                audio, sr = sf.read(temp_path)
-                # Convert to mono if stereo
-                if len(audio.shape) > 1:
-                    audio = np.mean(audio, axis=1)
-                print(f"Loaded audio with soundfile: {len(audio)} samples at {sr} Hz")
-            except Exception as sf_error:
-                print(f"Error loading with soundfile: {sf_error}")
-                raise Exception(f"Could not load audio file. Format: {file_ext}. Please ensure ffmpeg is installed or try recording again.")
+            error_msg = str(load_error)
+            print(f"✗ Audio loading failed: {error_msg}")
+            raise Exception(error_msg)
+
         
         # Check if audio is valid
         if len(audio) == 0:
@@ -116,15 +118,16 @@ def predict():
         
         # Preprocess audio
         audio, sr = preprocess_audio(audio, sr, target_sr=22050)
-        print(f"Preprocessed audio: {len(audio)} samples at {sr} Hz")
+        print(f"✓ Preprocessed audio: {len(audio)} samples at {sr} Hz")
         
         # Check minimum length
         if len(audio) < sr * 0.5:  # Less than 0.5 seconds
             raise Exception("Audio recording is too short. Please record for at least 1-2 seconds.")
         
         # Extract features
+        print(f"📊 Extracting features...")
         features = extract_all_features(audio, sr)
-        print(f"Extracted features: {features.shape}")
+        print(f"✓ Extracted features: {features.shape}")
         
         if len(features) == 0 or np.all(features == 0):
             raise Exception("Could not extract valid features from audio")
@@ -136,11 +139,15 @@ def predict():
             raise Exception(f"Feature count mismatch: got {features.shape[1]}, expected {scaler.n_features_in_}")
         
         # Scale features
+        print(f"🔧 Scaling features...")
         features_scaled = scaler.transform(features)
+        print(f"✓ Features scaled")
         
         # Predict
+        print(f"🧠 Running prediction...")
         prediction = model.predict(features_scaled)[0]
         probability = model.predict_proba(features_scaled)[0]
+        print(f"✓ Prediction complete: {prediction}")
         
         # Get risk score (probability of Parkinson's)
         risk_score = probability[1] * 100
@@ -204,5 +211,9 @@ if __name__ == '__main__':
     if not load_model():
         print("Warning: Model not loaded. Please run train_model.py first.")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Get port from environment variable (for deployment) or use 5000
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    
+    app.run(debug=debug, host='0.0.0.0', port=port)
 
