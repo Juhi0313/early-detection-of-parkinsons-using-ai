@@ -22,3 +22,6 @@ dist/
 build/
 *.egg-info/
 
+# Unrelated template files
+2.HTML_Template_Dashboard/
+
