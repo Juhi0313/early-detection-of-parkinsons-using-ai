@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Parkinson's Detection | Voice Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">
+                <span class="gradient-text">AI</span> for Early Detection of
+                <span class="gradient-text">Parkinson's</span>
+            </h1>
+            <p class="subtitle">Advanced Voice Analysis Technology</p>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Voice Recording & Analysis</h2>
+                    <p>Record your voice to detect early signs of Parkinson's disease</p>
+                </div>
+
+                <div class="recording-section">
+                    <div class="audio-visualizer" id="visualizer">
+                        <canvas id="canvas"></canvas>
+                    </div>
+
+                    <div class="controls">
+                        <button id="recordBtn" class="neon-button record-btn">
+                            <span class="button-icon">🎤</span>
+                            <span class="button-text">Start Recording</span>
+                        </button>
+                        <button id="stopBtn" class="neon-button stop-btn" disabled>
+                            <span class="button-icon">⏹</span>
+                            <span class="button-text">Stop Recording</span>
+                        </button>
+                        <button id="analyzeBtn" class="neon-button analyze-btn" disabled>
+                            <span class="button-icon">🔍</span>
+                            <span class="button-text">Analyze Voice</span>
+                        </button>
+                    </div>
+
+                    <div class="recording-info" id="recordingInfo">
+                        <p>Click "Start Recording" to begin</p>
+                    </div>
+                </div>
+
+                <div class="results-section" id="resultsSection" style="display: none;">
+                    <div class="result-card">
+                        <h3>Analysis Results</h3>
+                        <div class="risk-meter">
+                            <div class="risk-label">Risk Score</div>
+                            <div class="risk-value" id="riskValue">0%</div>
+                            <div class="risk-bar-container">
+                                <div class="risk-bar" id="riskBar"></div>
+                            </div>
+                        </div>
+
+                        <div class="prediction-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Status:</span>
+                                <span class="detail-value" id="statusValue">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Healthy Probability:</span>
+                                <span class="detail-value" id="healthyProb">-</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Parkinson's Probability:</span>
+                                <span class="detail-value" id="parkinsonsProb">-</span>
+                            </div>
+                        </div>
+
+                        <div class="message-box" id="messageBox">
+                            <p id="messageText">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h3>How It Works</h3>
+                <ul>
+                    <li>🎤 Record your voice for 3-5 seconds</li>
+                    <li>🔬 Advanced AI analyzes acoustic features</li>
+                    <li>📊 Get instant risk assessment</li>
+                    <li>⚡ Early detection can save lives</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Powered by Machine Learning & Voice Analysis Technology</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/recorder.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
+
