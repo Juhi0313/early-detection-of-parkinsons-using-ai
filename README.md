@@ -2,7 +2,7 @@
 
 A cutting-edge web application that uses machine learning to detect early signs of Parkinson's disease through voice analysis. The application analyzes acoustic features from voice recordings to provide real-time risk assessment.
 
-## 🎯 Features
+##  Features
 
 - **Real-time Voice Recording**: Record voice directly through the browser
 - **Advanced Feature Extraction**: Extracts pitch, jitter, shimmer, MFCCs, HNR, and spectral features
@@ -11,7 +11,7 @@ A cutting-edge web application that uses machine learning to detect early signs 
 - **Live Visualization**: Real-time audio waveform visualization during recording
 - **Risk Assessment**: Provides detailed risk scores and probabilities
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -67,7 +67,7 @@ A cutting-edge web application that uses machine learning to detect early signs 
 7. **Open your browser**
    Navigate to `http://localhost:5000`
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 .
@@ -89,7 +89,7 @@ A cutting-edge web application that uses machine learning to detect early signs 
 └── README.md              # This file
 ```
 
-## 🎨 Features Explained
+## Features Explained
 
 ### Voice Recording
 
@@ -117,7 +117,7 @@ The system extracts 35 acoustic features including:
 - Shows probabilities for both healthy and Parkinson's classes
 - Displays clear status message
 
-## 🔬 Technical Details
+## Technical Details
 
 ### Model
 
@@ -138,7 +138,7 @@ The system extracts 35 acoustic features including:
 - **Frontend**: HTML5, CSS3, JavaScript
 - **Audio API**: Web Audio API, MediaRecorder API
 
-## 📊 Datasets
+## Datasets
 
 The model is trained on:
 
@@ -155,7 +155,7 @@ The model is trained on:
 
 4. **Microphone Permissions**: The browser will ask for microphone permissions. Please allow access for the app to work.
 
-## 🎯 Usage Tips
+## Usage Tips
 
 1. **Recording Quality**:
 
@@ -185,17 +185,17 @@ The model is trained on:
 - Make sure virtual environment is activated
 - Run `pip install -r requirements.txt` again
 
-## 📝 License
+##  License
 
 This project is created for educational and research purposes.
 
-## 👥 Credits
+##  Credits
 
 - UCI Machine Learning Repository for datasets
 - librosa for audio processing
 - scikit-learn for machine learning
 
-## 🚀 Future Enhancements
+## Future Enhancements
 
 - Multi-language support
 - Batch processing of multiple recordings
